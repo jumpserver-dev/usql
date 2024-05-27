@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/jumpserver-dev/usql/handler"
+	"github.com/xo/usql/metacmd"
 	"io"
 	"os"
 	"os/user"
@@ -16,8 +18,6 @@ import (
 	"github.com/spf13/viper"
 	"github.com/xo/dburl"
 	"github.com/xo/usql/env"
-	"github.com/xo/usql/handler"
-	"github.com/xo/usql/metacmd"
 	"github.com/xo/usql/rline"
 	"github.com/xo/usql/text"
 )

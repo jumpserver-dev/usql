@@ -8,6 +8,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/jumpserver-dev/usql/metacmd"
+	"github.com/jumpserver-dev/usql/text"
 	"io"
 	"log"
 	"net/url"
@@ -35,11 +37,9 @@ import (
 	"github.com/xo/usql/drivers/completer"
 	"github.com/xo/usql/drivers/metadata"
 	"github.com/xo/usql/env"
-	"github.com/xo/usql/metacmd"
 	"github.com/xo/usql/rline"
 	"github.com/xo/usql/stmt"
 	ustyles "github.com/xo/usql/styles"
-	"github.com/xo/usql/text"
 )
 
 // Handler is a input process handler.
@@ -236,7 +236,7 @@ func (h *Handler) Run() error {
 			}
 		}
 		// welcome text
-		fmt.Fprintln(stdout, text.WelcomeDesc)
+		fmt.Fprintln(stdout, "Welcome to \033[32mJumpServer\033[0m database CLI. \nType \\? for help.")
 		fmt.Fprintln(stdout)
 	}
 	var lastErr error
@@ -307,12 +307,12 @@ func (h *Handler) Run() error {
 			}
 			if s := strings.ToLower(helpQuitExitRE.FindString(string(h.buf.Buf[i:]))); s != "" {
 				switch s {
-				case "help":
-					s = text.HelpDescShort
-					if first {
-						s = text.HelpDesc
-						h.buf.Reset(nil)
-					}
+				//case "help":
+				//	s = text.HelpDescShort
+				//	if first {
+				//		s = text.HelpDesc
+				//		h.buf.Reset(nil)
+				//	}
 				case "quit", "exit":
 					s = text.QuitDesc
 					if first {
