@@ -4,12 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/xo/dburl"
+	"github.com/xo/usql/drivers"
 	"github.com/xo/usql/env"
 	"github.com/xo/usql/text"
 	"io"
 	"os"
 	"os/exec"
 	"os/signal"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -34,6 +37,52 @@ var sectMap map[Section][]Metacmd
 
 func init() {
 	cmds = []Cmd{
+		Drivers: {
+			Section: SectionGeneral,
+			Name:    "drivers",
+			Desc:    Desc{"display information about available database drivers", ""},
+			Process: func(p *Params) error {
+				stdout, stderr := p.Handler.IO().Stdout(), p.Handler.IO().Stderr()
+				var cmd *exec.Cmd
+				var wc io.WriteCloser
+				if pager := env.Get("PAGER"); p.Handler.IO().Interactive() && pager != "" {
+					var err error
+					if wc, cmd, err = env.Pipe(stdout, stderr, pager); err != nil {
+						return err
+					}
+					stdout = wc
+				}
+				available := drivers.Available()
+				names := make([]string, len(available))
+				var z int
+				for k := range available {
+					names[z] = k
+					z++
+				}
+				sort.Strings(names)
+				fmt.Fprintln(stdout, text.AvailableDrivers)
+				for _, n := range names {
+					s := "  " + n
+					driver, aliases := dburl.SchemeDriverAndAliases(n)
+					if driver != n {
+						s += " (" + driver + ")"
+					}
+					if len(aliases) > 0 {
+						if len(aliases) > 0 {
+							s += " [" + strings.Join(aliases, ", ") + "]"
+						}
+					}
+					fmt.Fprintln(stdout, s)
+				}
+				if cmd != nil {
+					if err := wc.Close(); err != nil {
+						return err
+					}
+					return cmd.Wait()
+				}
+				return nil
+			},
+		},
 		Question: {
 			Section: SectionHelp,
 			Name:    "?",
