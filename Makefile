@@ -10,7 +10,7 @@ GOARCH:=$(shell go env GOARCH)
 
 LDFLAGS=-w -s
 
-GOLDFLAGS=-X 'github.com/jumpserver-dev/usql/text.CommandVersion=$(VERSION)'
+GOLDFLAGS=-X 'github.com/xo/usql/text.CommandVersion=$(VERSION)'
 
 USQLBUILD=CGO_ENABLED=0 go build -trimpath -ldflags "$(GOLDFLAGS) ${LDFLAGS}"
 
