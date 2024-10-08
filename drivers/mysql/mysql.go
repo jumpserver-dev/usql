@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/go-sql-driver/mysql" // DRIVER
 	"github.com/xo/usql/drivers"
@@ -30,7 +31,9 @@ func init() {
 		}),
 		Open: func(ctx context.Context, url *dburl.URL, f func() io.Writer, f2 func() io.Writer) (func(string, string) (*sql.DB, error), error) {
 			return func(_, dsn string) (*sql.DB, error) {
-				parsedURL, err := url.Parse(dsn)
+				safeDsn := strings.Replace(dsn, "_", "", -1)
+
+				parsedURL, err := url.Parse(safeDsn)
 				if err != nil {
 					return nil, err
 				}
