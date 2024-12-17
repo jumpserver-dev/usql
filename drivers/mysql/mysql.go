@@ -6,11 +6,13 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"fmt"
-	"github.com/xo/dburl"
 	"io"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/xo/dburl"
 
 	"github.com/go-sql-driver/mysql" // DRIVER
 	"github.com/xo/usql/drivers"
@@ -40,6 +42,10 @@ func init() {
 
 				queryParams := parsedURL.Query()
 
+				// If the host is an IPv6 address, it needs to be enclosed in square brackets
+				if hostIp, err1 := netip.ParseAddr(url.Hostname()); err1 == nil && hostIp.Is6() {
+					dsn = strings.Replace(dsn, url.Hostname(), fmt.Sprintf("[%s]", url.Hostname()), 1)
+				}
 				if queryParams.Get("tls") == "custom" {
 
 					sslCA := queryParams.Get("ssl-ca")
@@ -56,7 +62,6 @@ func init() {
 
 					parsedURL.RawQuery = queryParams.Encode()
 					dsn = parsedURL.String()
-
 					rootCertPool := x509.NewCertPool()
 					pem, err := os.ReadFile(sslCA)
 					if err != nil {
