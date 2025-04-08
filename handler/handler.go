@@ -732,6 +732,22 @@ func (h *Handler) Highlight(w io.Writer, buf string) error {
 // appears to be a file on disk, then an attempt will be made to open it with
 // an appropriate driver (mysql, postgres, sqlite3) depending on the type (unix
 // domain socket, directory, or regular file, respectively).
+
+func ReplaceDBName(s, newDB string) (string, error) {
+	// 使用正则提取 dbname=xxx
+	re := regexp.MustCompile(`dbname=([^\s]+)`)
+	match := re.FindStringSubmatch(s)
+
+	if len(match) < 2 {
+		return "", fmt.Errorf("dbname not found")
+	}
+
+	// 构造替换后的字符串
+	newStr := re.ReplaceAllString(s, "dbname="+newDB)
+
+	return newStr, nil
+}
+
 func (h *Handler) Open(ctx context.Context, params ...string) error {
 	if len(params) == 0 || params[0] == "" {
 		return nil
@@ -740,24 +756,40 @@ func (h *Handler) Open(ctx context.Context, params ...string) error {
 		return text.ErrPreviousTransactionExists
 	}
 	if len(params) == 1 {
-		if v, ok := env.Cget(params[0]); ok {
-			params = v
+		if ctx.Value("CHANGE_DATABASE") == "1" {
+
+			if h.u.OriginalScheme != "postgres" {
+				return errors.New("change database only support 'postgress'")
+			}
+
+			newDSN, err := ReplaceDBName(h.u.DSN, params[0])
+			if err != nil {
+				return err
+			}
+			h.u.DSN = newDSN
+		} else {
+			if v, ok := env.Cget(params[0]); ok {
+				params = v
+			}
 		}
+
 	}
-	if len(params) < 2 {
-		dsn := params[0]
-		// parse dsn
-		u, err := dburl.Parse(dsn)
-		if err != nil {
-			return err
-		}
-		h.u = u
-		// force parameters
-		h.forceParams(h.u)
-	} else {
-		h.u = &dburl.URL{
-			Driver: params[0],
-			DSN:    strings.Join(params[1:], " "),
+	if ctx.Value("CHANGE_DATABASE") != "1" {
+		if len(params) < 2 {
+			dsn := params[0]
+			// parse dsn
+			u, err := dburl.Parse(dsn)
+			if err != nil {
+				return err
+			}
+			h.u = u
+			// force parameters
+			h.forceParams(h.u)
+		} else {
+			h.u = &dburl.URL{
+				Driver: params[0],
+				DSN:    strings.Join(params[1:], " "),
+			}
 		}
 	}
 	// open connection

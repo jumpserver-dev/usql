@@ -83,6 +83,23 @@ func init() {
 				return nil
 			},
 		},
+		Connect: {
+			Section: SectionConnection,
+			Name:    "c",
+			Desc:    Desc{"connect to new database", "database name"},
+			Aliases: map[string]Desc{
+				"connect": {},
+			},
+			Process: func(p *Params) error {
+				vals, err := p.GetAll(true)
+				if err != nil {
+					return err
+				}
+				ctx, cancel := signal.NotifyContext(context.WithValue(context.Background(), "CHANGE_DATABASE", "1"), os.Interrupt)
+				defer cancel()
+				return p.Handler.Open(ctx, vals...)
+			},
+		},
 		Question: {
 			Section: SectionHelp,
 			Name:    "?",

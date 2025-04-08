@@ -20,6 +20,7 @@ type Section string
 const (
 	SectionGeneral       Section = "General"
 	SectionHelp          Section = "Help"
+	SectionConnection    Section = "Connection"
 	SectionTransaction   Section = "Transaction"
 	SectionInformational Section = "Informational"
 )
@@ -35,6 +36,7 @@ var SectionOrder = []Section{
 	SectionHelp,
 	SectionInformational,
 	SectionTransaction,
+	SectionConnection,
 }
 
 // Listing writes the formatted command listing to w, separated into different
