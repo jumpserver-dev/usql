@@ -29,7 +29,6 @@ func init() {
 		ForceParams: drivers.ForceQueryParameters([]string{
 			"parseTime", "true",
 			"loc", "Local",
-			"sql_mode", "ansi",
 		}),
 		Open: func(ctx context.Context, url *dburl.URL, f func() io.Writer, f2 func() io.Writer) (func(string, string) (*sql.DB, error), error) {
 			return func(_, dsn string) (*sql.DB, error) {
