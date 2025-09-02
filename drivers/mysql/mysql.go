@@ -32,9 +32,7 @@ func init() {
 		}),
 		Open: func(ctx context.Context, url *dburl.URL, f func() io.Writer, f2 func() io.Writer) (func(string, string) (*sql.DB, error), error) {
 			return func(_, dsn string) (*sql.DB, error) {
-				safeDsn := strings.Replace(dsn, "_", "", -1)
-
-				parsedURL, err := url.Parse(safeDsn)
+				parsedURL, err := url.Parse(dsn)
 				if err != nil {
 					return nil, err
 				}
@@ -51,9 +49,9 @@ func init() {
 					sslCert := queryParams.Get("ssl-cert")
 					sslKey := queryParams.Get("ssl-key")
 
-					if sslCA == "" || sslCert == "" || sslKey == "" {
-						return nil, fmt.Errorf("missing required ssl-ca, ssl-cert, or ssl-key parameter")
-					}
+					//if sslCA == "" || sslCert == "" || sslKey == "" {
+					//	return nil, fmt.Errorf("missing required ssl-ca, ssl-cert, or ssl-key parameter")
+					//}
 
 					queryParams.Del("ssl-ca")
 					queryParams.Del("ssl-cert")
@@ -62,24 +60,29 @@ func init() {
 					parsedURL.RawQuery = queryParams.Encode()
 					dsn = parsedURL.String()
 					rootCertPool := x509.NewCertPool()
-					pem, err := os.ReadFile(sslCA)
-					if err != nil {
-						return nil, fmt.Errorf("failed to read CA cert: %v", err)
-					}
-					if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
-						return nil, fmt.Errorf("failed to append CA cert to pool")
-					}
-
-					certs, err := tls.LoadX509KeyPair(sslCert, sslKey)
-					if err != nil {
-						return nil, fmt.Errorf("failed to load client cert and key: %v", err)
-					}
 
 					tlsConfig := &tls.Config{
-						RootCAs:      rootCertPool,
-						Certificates: []tls.Certificate{certs},
+						InsecureSkipVerify: true,
 					}
 
+					if sslCA != "" {
+						pem, err := os.ReadFile(sslCA)
+						if err != nil {
+							return nil, fmt.Errorf("failed to read CA cert: %v", err)
+						}
+						if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
+							return nil, fmt.Errorf("failed to append CA cert to pool")
+						}
+						tlsConfig.RootCAs = rootCertPool
+					}
+
+					if sslCert != "" && sslKey != "" {
+						certs, err := tls.LoadX509KeyPair(sslCert, sslKey)
+						if err != nil {
+							return nil, fmt.Errorf("failed to load client cert and key: %v", err)
+						}
+						tlsConfig.Certificates = []tls.Certificate{certs}
+					}
 					err = mysql.RegisterTLSConfig("custom", tlsConfig)
 					if err != nil {
 						return nil, fmt.Errorf("failed to register custom TLS config: %v", err)
