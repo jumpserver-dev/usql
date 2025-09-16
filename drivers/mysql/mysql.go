@@ -20,6 +20,22 @@ import (
 	mymeta "github.com/xo/usql/drivers/metadata/mysql"
 )
 
+func CleanDSNUser(dsn string) (string, string, string) {
+	colonIdx := strings.Index(dsn, ":")
+	if colonIdx == -1 {
+		origUser := dsn
+		cleanUser := strings.ReplaceAll(origUser, "_", "")
+		return origUser, cleanUser, cleanUser
+	}
+
+	origUser := dsn[:colonIdx]
+	cleanUser := strings.ReplaceAll(origUser, "_", "")
+	rest := dsn[colonIdx:]
+
+	cleanedDSN := cleanUser + rest
+	return origUser, cleanUser, cleanedDSN
+}
+
 func init() {
 	drivers.Register("mysql", drivers.Driver{
 		AllowMultilineComments: true,
@@ -32,7 +48,8 @@ func init() {
 		}),
 		Open: func(ctx context.Context, url *dburl.URL, f func() io.Writer, f2 func() io.Writer) (func(string, string) (*sql.DB, error), error) {
 			return func(_, dsn string) (*sql.DB, error) {
-				parsedURL, err := url.Parse(dsn)
+				username, newUsername, newDsn := CleanDSNUser(dsn)
+				parsedURL, err := url.Parse(newDsn)
 				if err != nil {
 					return nil, err
 				}
@@ -59,6 +76,7 @@ func init() {
 
 					parsedURL.RawQuery = queryParams.Encode()
 					dsn = parsedURL.String()
+					dsn = strings.Replace(dsn, newUsername, username, -1)
 					rootCertPool := x509.NewCertPool()
 
 					tlsConfig := &tls.Config{
