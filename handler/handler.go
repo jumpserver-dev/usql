@@ -8,7 +8,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/jumpserver-dev/usql/feature"
 	"github.com/jumpserver-dev/usql/metacmd"
+	"github.com/jumpserver-dev/usql/store"
 	"github.com/jumpserver-dev/usql/text"
 	"io"
 	"log"
@@ -1182,6 +1184,33 @@ func (h *Handler) doQuery(ctx context.Context, w io.Writer, opt metacmd.Option, 
 	} else if opt.Exec != metacmd.ExecWatch {
 		params["pager_cmd"] = env.All()["PAGER"]
 	}
+
+	var wRows *WarpRows
+	rules, exists := store.GetGlobalStore().Get(feature.DataMaskingKey)
+	dataMaskingRules := rules.([]feature.DataMaskingRule)
+
+	if exists {
+		maskIndexes := make([]int, 0)
+		maskRules := make(map[int]feature.DataMaskingRule)
+		for i := range dataMaskingRules {
+
+			dbColumns, err := rows.Columns()
+			if err != nil {
+				return err
+			}
+			for j := range dbColumns {
+				if dbColumns[j] == dataMaskingRules[i].FieldsPattern {
+					maskIndexes = append(maskIndexes, j)
+					maskRules[j] = dataMaskingRules[i]
+				}
+			}
+		}
+		wRows = &WarpRows{rows: rows, maskIndexes: maskIndexes, dataMaskRules: maskRules}
+
+	} else {
+		wRows = &WarpRows{rows: rows}
+	}
+
 	// set up column type config
 	var extra []tblfmt.Option
 	switch f := drivers.ColumnTypes(h.u); {
@@ -1191,7 +1220,7 @@ func (h *Handler) doQuery(ctx context.Context, w io.Writer, opt metacmd.Option, 
 		extra = append(extra, tblfmt.WithUseColumnTypes(true))
 	}
 	// wrap query with crosstab
-	resultSet := tblfmt.ResultSet(rows)
+	resultSet := tblfmt.ResultSet(wRows)
 	if opt.Exec == metacmd.ExecCrosstab {
 		var err error
 		resultSet, err = tblfmt.NewCrosstabView(rows, append(extra, tblfmt.WithParams(opt.Crosstab...))...)
@@ -1203,6 +1232,7 @@ func (h *Handler) doQuery(ctx context.Context, w io.Writer, opt metacmd.Option, 
 	if drivers.LowerColumnNames(h.u) {
 		params["lower_column_names"] = "true"
 	}
+
 	// encode and handle error conditions
 	switch err := tblfmt.EncodeAll(w, resultSet, params, extra...); {
 	case err != nil && cmd != nil && errors.Is(err, syscall.EPIPE):
