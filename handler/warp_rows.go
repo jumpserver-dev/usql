@@ -66,6 +66,7 @@ func (w *WarpRows) Scan(dest ...interface{}) error {
 		}
 	}
 	return nil
+
 }
 
 func replaceColumnVal(rule feature.DataMaskingRule, val string) string {

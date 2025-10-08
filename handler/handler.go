@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/dlclark/regexp2"
 	"github.com/jumpserver-dev/usql/feature"
 	"github.com/jumpserver-dev/usql/metacmd"
 	"github.com/jumpserver-dev/usql/store"
@@ -1199,7 +1200,7 @@ func (h *Handler) doQuery(ctx context.Context, w io.Writer, opt metacmd.Option, 
 				return err
 			}
 			for j := range dbColumns {
-				if dbColumns[j] == dataMaskingRules[i].FieldsPattern {
+				if matchRule(dataMaskingRules[i].FieldsPattern, dbColumns[j]) {
 					maskIndexes = append(maskIndexes, j)
 					maskRules[j] = dataMaskingRules[i]
 				}
@@ -1254,6 +1255,25 @@ func (h *Handler) doQuery(ctx context.Context, w io.Writer, opt metacmd.Option, 
 		}
 	}
 	return err
+}
+
+func matchRule(patterns string, name string) bool {
+	var ps = strings.Split(patterns, ",")
+	for j := range ps {
+		syntaxFlag := regexp2.RE2 | regexp2.IgnoreCase
+		re, err := regexp2.Compile(ps[j], regexp2.RegexOptions(syntaxFlag))
+		if err != nil {
+			return false
+		}
+		matched, err := re.MatchString(name)
+		if err != nil {
+			return false
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
 }
 
 // doExecRows executes all the columns in the row.
