@@ -5,10 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"github.com/jumpserver-dev/usql/feature"
-	"github.com/jumpserver-dev/usql/store"
 	"github.com/xo/dburl"
 	"io"
 	"net/netip"
@@ -84,21 +81,6 @@ func init() {
 			if hostIp, err1 := netip.ParseAddr(url.Hostname()); err1 == nil && hostIp.Is6() {
 				dsn = strings.Replace(dsn, url.Hostname(), fmt.Sprintf("[%s]", url.Hostname()), 1)
 			}
-
-			if queryParams.Get(feature.DataMaskingKey) != "" {
-
-				rulesJson := queryParams.Get(feature.DataMaskingKey)
-				var rules []feature.DataMaskingRule
-				if err := json.Unmarshal([]byte(rulesJson), &rules); err != nil {
-					return nil, err
-				}
-				queryParams.Del(feature.DataMaskingKey)
-				parsedURL.RawFragment = ""
-				parsedURL.Fragment = ""
-
-				store.GetGlobalStore().Set(feature.DataMaskingKey, rules)
-			}
-
 			if queryParams.Get("tls") == "custom" {
 
 				sslCA := queryParams.Get("ssl-ca")
@@ -144,7 +126,6 @@ func init() {
 			}
 
 			parsedURL.RawQuery = queryParams.Encode()
-			fmt.Println(queryParams.Encode())
 			dsn = parsedURL.String()
 			dsn = strings.Replace(dsn, newUsername, username, -1)
 

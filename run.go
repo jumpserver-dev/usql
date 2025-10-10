@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/jumpserver-dev/usql/feature"
 	"github.com/jumpserver-dev/usql/handler"
+	"github.com/jumpserver-dev/usql/store"
 	"github.com/xo/usql/metacmd"
 	"io"
+	"net/url"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -321,6 +325,38 @@ func Run(ctx context.Context, args *Args, connections map[string]interface{}, in
 			return err
 		}
 	}
+
+	// 从 dsn 中 解析脱敏的参数
+
+	var queryPart string
+	parts := strings.SplitN(dsn, "?", 2)
+	base := parts[0] // 去掉 query 后的部分
+	if len(parts) > 1 {
+		queryPart = parts[1]
+	}
+
+	values, err := url.ParseQuery(queryPart)
+	if err != nil {
+		return err
+	}
+
+	if values.Has(feature.DataMaskingKey) {
+		rulesJson := values.Get(feature.DataMaskingKey)
+		var rules []feature.DataMaskingRule
+		if err := json.Unmarshal([]byte(rulesJson), &rules); err != nil {
+			return err
+		}
+		store.GetGlobalStore().Set(feature.DataMaskingKey, rules)
+		// 删除某个参数
+		values.Del(feature.DataMaskingKey)
+		// 如果还剩参数就重新拼回 DSN
+		newDSN := base
+		if len(values.Encode()) > 0 {
+			newDSN = fmt.Sprintf("%s?%s", base, values.Encode())
+		}
+		dsn = newDSN
+	}
+
 	// open dsn
 	if err = h.Open(ctx, dsn); err != nil {
 		return err
