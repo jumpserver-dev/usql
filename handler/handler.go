@@ -1188,9 +1188,9 @@ func (h *Handler) doQuery(ctx context.Context, w io.Writer, opt metacmd.Option, 
 
 	var wRows *WarpRows
 	rules, exists := store.GetGlobalStore().Get(feature.DataMaskingKey)
-	dataMaskingRules := rules.([]feature.DataMaskingRule)
 
 	if exists {
+		dataMaskingRules := rules.([]feature.DataMaskingRule)
 		maskIndexes := make([]int, 0)
 		maskRules := make(map[int]feature.DataMaskingRule)
 		for i := range dataMaskingRules {
