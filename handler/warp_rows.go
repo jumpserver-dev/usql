@@ -59,10 +59,18 @@ func (w *WarpRows) Scan(dest ...interface{}) error {
 						val = replaceColumnVal(rule, src.(*sql.NullString).String)
 					}
 				}
-				dest[i] = val
+				if src != nil {
+					dest[i] = val
+				} else {
+					dest[i] = "NULL"
+				}
 			}
 		} else {
-			dest[i] = src
+			if src != nil {
+				dest[i] = src
+			} else {
+				dest[i] = "NULL"
+			}
 		}
 	}
 	return nil
