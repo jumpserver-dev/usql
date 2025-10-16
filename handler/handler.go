@@ -1257,17 +1257,41 @@ func (h *Handler) doQuery(ctx context.Context, w io.Writer, opt metacmd.Option, 
 	return err
 }
 
+// 将带通配符的模式，转成安全的正则，并加上 ^...$
+func wildcardToRegexAnchored(p string) string {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return "^$"
+	}
+	// 先把用户输入整体转义，避免正则元字符被误用
+	esc := regexp.QuoteMeta(p) // 例如 "." 会变成 "\."
+	// 再把被转义的 "\*" 还原为 ".*" 以实现通配符
+	esc = strings.ReplaceAll(esc, `\*`, ".*")
+	// 最终加锚点，做到“整串匹配”
+	return "^" + esc + "$"
+}
+
 func matchRule(patterns string, name string) bool {
-	var ps = strings.Split(patterns, ",")
-	for j := range ps {
-		syntaxFlag := regexp2.RE2 | regexp2.IgnoreCase
-		re, err := regexp2.Compile(ps[j], regexp2.RegexOptions(syntaxFlag))
-		if err != nil {
-			return false
+	ps := strings.Split(patterns, ",")
+	for _, raw := range ps {
+		p := strings.TrimSpace(raw)
+		if p == "" {
+			continue
 		}
+
+		regex := wildcardToRegexAnchored(p)
+
+		// 忽略大小写（按需）
+		opts := regexp2.RE2 | regexp2.IgnoreCase
+		re, err := regexp2.Compile(regex, regexp2.RegexOptions(opts))
+		if err != nil {
+			// 某个模式坏了就跳过，不要整体失败
+			continue
+		}
+
 		matched, err := re.MatchString(name)
 		if err != nil {
-			return false
+			continue
 		}
 		if matched {
 			return true
