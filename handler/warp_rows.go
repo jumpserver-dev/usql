@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/jumpserver-dev/usql/feature"
 	"strings"
 )
@@ -48,6 +49,7 @@ func (w *WarpRows) Scan(dest ...interface{}) error {
 		if contains(w.maskIndexes, i) {
 			rule, ok := w.dataMaskRules[i]
 			val := rule.MaskPattern
+
 			if ok {
 				switch src.(type) {
 				case []byte:
@@ -58,6 +60,8 @@ func (w *WarpRows) Scan(dest ...interface{}) error {
 					if src.(*sql.NullString).Valid {
 						val = replaceColumnVal(rule, src.(*sql.NullString).String)
 					}
+				case string:
+					val = replaceColumnVal(rule, src.(string))
 				}
 				if src != nil {
 					dest[i] = val
@@ -78,6 +82,7 @@ func (w *WarpRows) Scan(dest ...interface{}) error {
 }
 
 func replaceColumnVal(rule feature.DataMaskingRule, val string) string {
+	fmt.Println(rule.MaskingMethod)
 	switch rule.MaskingMethod {
 	case feature.MaskingMethodFixedChar:
 		// 固定字符替换
