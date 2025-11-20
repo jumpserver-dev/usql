@@ -2,7 +2,6 @@ package handler
 
 import (
 	"database/sql"
-	"fmt"
 	"github.com/jumpserver-dev/usql/feature"
 	"strings"
 )
@@ -82,7 +81,6 @@ func (w *WarpRows) Scan(dest ...interface{}) error {
 }
 
 func replaceColumnVal(rule feature.DataMaskingRule, val string) string {
-	fmt.Println(rule.MaskingMethod)
 	switch rule.MaskingMethod {
 	case feature.MaskingMethodFixedChar:
 		// 固定字符替换
