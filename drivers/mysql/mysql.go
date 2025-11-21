@@ -17,24 +17,7 @@ import (
 	"github.com/xo/usql/drivers"
 	"github.com/xo/usql/drivers/metadata"
 	mymeta "github.com/xo/usql/drivers/metadata/mysql"
-	uu "net/url"
 )
-
-func CleanDSNUser(dsn string) (string, string, string) {
-	colonIdx := strings.Index(dsn, ":")
-	if colonIdx == -1 {
-		origUser := dsn
-		cleanUser := strings.ReplaceAll(origUser, "_", "")
-		return origUser, cleanUser, cleanUser
-	}
-
-	origUser := dsn[:colonIdx]
-	cleanUser := strings.ReplaceAll(origUser, "_", "")
-	rest := dsn[colonIdx:]
-
-	cleanedDSN := cleanUser + rest
-	return origUser, cleanUser, cleanedDSN
-}
 
 func init() {
 	d := drivers.Driver{
@@ -68,15 +51,9 @@ func init() {
 
 	d.Open = func(ctx context.Context, url *dburl.URL, f func() io.Writer, f2 func() io.Writer) (func(string, string) (*sql.DB, error), error) {
 		return func(_, dsn string) (*sql.DB, error) {
-			dsn, _ = uu.PathUnescape(dsn)
-			username, newUsername, newDsn := CleanDSNUser(dsn)
-			parsedURL, err := url.Parse(newDsn)
-			if err != nil {
-				return nil, err
-			}
+			url.RawQuery = url.RawQuery + url.RawFragment
+			queryParams := url.Query()
 
-			parsedURL.RawQuery = parsedURL.RawQuery + parsedURL.RawFragment
-			queryParams := parsedURL.Query()
 			// If the host is an IPv6 address, it needs to be enclosed in square brackets
 			if hostIp, err1 := netip.ParseAddr(url.Hostname()); err1 == nil && hostIp.Is6() {
 				dsn = strings.Replace(dsn, url.Hostname(), fmt.Sprintf("[%s]", url.Hostname()), 1)
@@ -86,10 +63,6 @@ func init() {
 				sslCA := queryParams.Get("ssl-ca")
 				sslCert := queryParams.Get("ssl-cert")
 				sslKey := queryParams.Get("ssl-key")
-
-				//if sslCA == "" || sslCert == "" || sslKey == "" {
-				//	return nil, fmt.Errorf("missing required ssl-ca, ssl-cert, or ssl-key parameter")
-				//}
 
 				queryParams.Del("ssl-ca")
 				queryParams.Del("ssl-cert")
@@ -119,17 +92,14 @@ func init() {
 					}
 					tlsConfig.Certificates = []tls.Certificate{certs}
 				}
-				err = mysql.RegisterTLSConfig("custom", tlsConfig)
+				err := mysql.RegisterTLSConfig("custom", tlsConfig)
 				if err != nil {
 					return nil, fmt.Errorf("failed to register custom TLS config: %v", err)
 				}
 			}
 
-			parsedURL.RawQuery = queryParams.Encode()
-			dsn = parsedURL.String()
-			dsn = strings.Replace(dsn, newUsername, username, -1)
-
-			return sql.Open("mysql", dsn)
+			url.RawQuery = queryParams.Encode()
+			return sql.Open("mysql", url.DSN)
 		}, nil
 	}
 	drivers.Register("mysql", d, "memsql", "vitess", "tidb")
