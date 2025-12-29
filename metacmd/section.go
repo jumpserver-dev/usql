@@ -23,6 +23,7 @@ const (
 	SectionConnection    Section = "Connection"
 	SectionTransaction   Section = "Transaction"
 	SectionInformational Section = "Informational"
+	SectionFormatting    Section = "Formatting"
 )
 
 // String satisfies stringer.
@@ -35,6 +36,7 @@ var SectionOrder = []Section{
 	SectionGeneral,
 	SectionHelp,
 	SectionInformational,
+	SectionFormatting,
 	SectionTransaction,
 	SectionConnection,
 }

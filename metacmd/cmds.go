@@ -262,6 +262,94 @@ func init() {
 				return nil
 			},
 		},
+		SetPrintVar: {
+			Section: SectionFormatting,
+			Name:    "pset",
+			Desc:    Desc{"set table output option", "[NAME [VALUE]]"},
+			Aliases: map[string]Desc{
+				"a": {"toggle between unaligned and aligned output mode", ""},
+				"C": {"set table title, or unset if none", "[STRING]"},
+				"f": {"show or set field separator for unaligned query output", "[STRING]"},
+				"H": {"toggle HTML output mode", ""},
+				"T": {"set HTML <table> tag attributes, or unset if none", "[STRING]"},
+				"t": {"show only rows", "[on|off]"},
+				"x": {"toggle expanded output", "[on|off|auto]"},
+			},
+			Process: func(p *Params) error {
+				var ok bool
+				var val string
+				var err error
+				switch p.Name {
+				case "a", "H":
+				default:
+					ok, val, err = p.GetOK(true)
+					if err != nil {
+						return err
+					}
+				}
+				// display variables
+				if p.Name == "pset" && !ok {
+					return env.Pwrite(p.Handler.IO().Stdout())
+				}
+				var field, extra string
+				switch p.Name {
+				case "pset":
+					field = val
+					ok, val, err = p.GetOK(true)
+					if err != nil {
+						return err
+					}
+				case "a":
+					field = "format"
+				case "C":
+					field = "title"
+				case "f":
+					field = "fieldsep"
+				case "H":
+					field, extra = "format", "html"
+				case "t":
+					field = "tuples_only"
+				case "T":
+					field = "tableattr"
+				case "x":
+					field = "expanded"
+				}
+				if !ok {
+					if val, err = env.Ptoggle(field, extra); err != nil {
+						return err
+					}
+				} else {
+					if val, err = env.Pset(field, val); err != nil {
+						return err
+					}
+				}
+				// special replacement name for expanded field, when 'auto'
+				if field == "expanded" && val == "auto" {
+					field = "expanded_auto"
+				}
+				// format output
+				mask := text.FormatFieldNameSetMap[field]
+				unsetMask := text.FormatFieldNameUnsetMap[field]
+				switch {
+				case strings.Contains(mask, "%d"):
+					i, _ := strconv.Atoi(val)
+					p.Handler.Print(mask, i)
+				case unsetMask != "" && val == "":
+					p.Handler.Print(unsetMask)
+				case !strings.Contains(mask, "%"):
+					p.Handler.Print(mask)
+				default:
+					if field == "time" {
+						val = fmt.Sprintf("%q", val)
+						if tfmt := env.GoTime(); tfmt != val {
+							val = fmt.Sprintf("%s (%q)", val, tfmt)
+						}
+					}
+					p.Handler.Print(mask, val)
+				}
+				return nil
+			},
+		},
 		Stats: {
 			Section: SectionInformational,
 			Name:    "ss[+]",
