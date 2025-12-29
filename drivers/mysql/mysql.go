@@ -99,7 +99,11 @@ func init() {
 			}
 
 			url.RawQuery = queryParams.Encode()
-			return sql.Open("mysql", url.DSN)
+			newDSN, err := dburl.Parse(url.String())
+			if err != nil {
+				return nil, err
+			}
+			return sql.Open("mysql", newDSN.DSN)
 		}, nil
 	}
 	drivers.Register("mysql", d, "memsql", "vitess", "tidb")
