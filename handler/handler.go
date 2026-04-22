@@ -239,7 +239,7 @@ func (h *Handler) Run() error {
 			}
 		}
 		// welcome text
-		fmt.Fprintln(stdout, "Welcome to \033[32mJumpServer\033[0m database CLI. \nType \\? for help.")
+		fmt.Fprintln(stdout, "Welcome to \033[32mUSQL\033[0m database CLI. \nType \\? for help.")
 		fmt.Fprintln(stdout)
 	}
 	var lastErr error
