@@ -1,6 +1,6 @@
 module github.com/jumpserver-dev/usql
 
-go 1.24.6
+go 1.26.3
 
 require (
 	github.com/alecthomas/chroma/v2 v2.13.0
