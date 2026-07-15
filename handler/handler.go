@@ -736,21 +736,6 @@ func (h *Handler) Highlight(w io.Writer, buf string) error {
 // an appropriate driver (mysql, postgres, sqlite3) depending on the type (unix
 // domain socket, directory, or regular file, respectively).
 
-func ReplaceDBName(s, newDB string) (string, error) {
-	// 使用正则提取 dbname=xxx
-	re := regexp.MustCompile(`dbname=([^\s]+)`)
-	match := re.FindStringSubmatch(s)
-
-	if len(match) < 2 {
-		return "", fmt.Errorf("dbname not found")
-	}
-
-	// 构造替换后的字符串
-	newStr := re.ReplaceAllString(s, "dbname="+newDB)
-
-	return newStr, nil
-}
-
 func (h *Handler) Open(ctx context.Context, params ...string) error {
 	if len(params) == 0 || params[0] == "" {
 		return nil
@@ -760,16 +745,7 @@ func (h *Handler) Open(ctx context.Context, params ...string) error {
 	}
 	if len(params) == 1 {
 		if ctx.Value("CHANGE_DATABASE") == "1" {
-
-			if h.u.OriginalScheme != "postgres" {
-				return errors.New("change database only support 'postgress'")
-			}
-
-			newDSN, err := ReplaceDBName(h.u.DSN, params[0])
-			if err != nil {
-				return err
-			}
-			h.u.DSN = newDSN
+			return h.changeDatabase(ctx, params[0])
 		} else {
 			if v, ok := env.Cget(params[0]); ok {
 				params = v
@@ -826,6 +802,45 @@ func (h *Handler) Open(ctx context.Context, params ...string) error {
 	}
 	// reconnect
 	return h.Open(ctx, dsn)
+}
+
+// changeDatabase opens and validates a new PostgreSQL connection before
+// replacing the current connection. A failed switch must leave the handler's
+// current URL and connection untouched.
+func (h *Handler) changeDatabase(ctx context.Context, name string) error {
+	if h.u == nil || h.db == nil {
+		return text.ErrNotConnected
+	}
+	if h.u.OriginalScheme != "postgres" {
+		return errors.New("change database only supports 'postgres'")
+	}
+
+	// Reparse the URL after changing Path so that Path, String and DSN all
+	// describe the same database. Mutating only h.u.DSN leaves the prompt and
+	// later reconnects pointing at the old database.
+	nextURL := *h.u
+	nextURL.Path = "/" + name
+	nextURL.RawPath = ""
+	u, err := dburl.Parse(nextURL.String())
+	if err != nil {
+		return err
+	}
+	h.forceParams(u)
+
+	db, err := drivers.Open(ctx, u, h.GetOutput, h.l.Stderr)
+	if err != nil {
+		return err
+	}
+	if err = drivers.Ping(ctx, u, db); err != nil {
+		_ = db.Close()
+		return err
+	}
+
+	oldDB := h.db
+	h.u, h.db = u, db
+	drivers.ConfigStmt(h.u, h.buf)
+	_ = oldDB.Close()
+	return h.Version(ctx)
 }
 
 func (h *Handler) connStrings() []string {
