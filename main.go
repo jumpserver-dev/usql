@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	_ "github.com/jumpserver-dev/usql/drivers/dameng"
 	_ "github.com/jumpserver-dev/usql/drivers/mysql"
 	_ "github.com/jumpserver-dev/usql/store"
 	_ "github.com/xo/usql/drivers/clickhouse"

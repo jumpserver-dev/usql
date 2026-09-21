@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/mattn/go-isatty"
@@ -21,6 +22,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/xo/dburl"
+	"github.com/xo/usql/drivers"
 	"github.com/xo/usql/env"
 	"github.com/xo/usql/rline"
 	"github.com/xo/usql/text"
@@ -41,6 +43,7 @@ func New(cliargs []string) ContextExecutor {
 		powershellCompletion bool
 		noDescriptions       bool
 		badHelp              bool
+		listDrivers          bool
 	)
 	v := viper.New()
 	c := &cobra.Command{
@@ -122,6 +125,8 @@ func New(cliargs []string) ContextExecutor {
 				return cmd.GenPowerShellCompletionWithDesc(os.Stdout)
 			case badHelp:
 				return errors.New("unknown shorthand flag: 'h' in -h")
+			case listDrivers:
+				return writeAvailableDrivers(os.Stdout)
 			}
 			// run
 			if len(cliargs) > 0 {
@@ -145,6 +150,7 @@ func New(cliargs []string) ContextExecutor {
 	flags.BoolVar(&powershellCompletion, "completion-script-powershell", false, "output powershell completion script and exit")
 	flags.BoolVar(&noDescriptions, "no-descriptions", false, "disable descriptions in completion scripts")
 	flags.BoolVarP(&badHelp, "bad-help", "h", false, "bad help")
+	flags.BoolVar(&listDrivers, "drivers", false, "list available database drivers and exit")
 
 	// command / file flags
 	flags.VarP(commandOrFile{args, true}, "command", "c", "run only single command (SQL or internal) and exit")
@@ -221,6 +227,22 @@ func New(cliargs []string) ContextExecutor {
 		_, _ = w.Write([]byte(s))
 	}
 	return c
+}
+
+func writeAvailableDrivers(w io.Writer) error {
+	available := drivers.Available()
+	names := make([]string, 0, len(available))
+	for name := range available {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		if _, err := fmt.Fprintln(w, name); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Run runs the application.

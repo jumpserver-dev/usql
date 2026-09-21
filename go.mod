@@ -3,6 +3,7 @@ module github.com/jumpserver-dev/usql
 go 1.26.3
 
 require (
+	gitee.com/chunanyong/dm v1.8.23
 	github.com/alecthomas/chroma/v2 v2.13.0
 	github.com/dlclark/regexp2 v1.11.0
 	github.com/go-sql-driver/mysql v1.8.1
@@ -33,6 +34,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 // indirect
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
+	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
