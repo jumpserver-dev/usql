@@ -78,9 +78,36 @@ func registerURLScheme() {
 		Driver:    "dameng",
 		Transport: dburl.TransportTCP,
 		Aliases:   []string{"dm"},
-		Generator: func(url *dburl.URL) (string, string, error) {
-			dsn, _, err := generate(url)
-			return strings.TrimSpace(dsn), "dm", err
+		Generator: func(u *dburl.URL) (string, string, error) {
+			dsn, _, err := generate(u)
+			if err != nil || u.User == nil {
+				return strings.TrimSpace(dsn), "dm", err
+			}
+			// The DM driver splits userinfo itself but does not URL-decode it.
+			// Pass the decoded credentials to the driver; otherwise a password
+			// containing '@' is sent as '%40' and authentication fails.
+			username := u.User.Username()
+			if strings.Contains(username, ":") {
+				return "", "", errors.New("Dameng usernames containing ':' are not supported by the DM driver")
+			}
+			userinfo := username
+			if password, ok := u.User.Password(); ok {
+				userinfo += ":" + password
+			}
+			at := strings.Index(dsn, "@")
+			if at < 0 {
+				return "", "", errors.New("Dameng DSN is missing userinfo separator")
+			}
+			suffix := dsn[at:]
+			hasQuery := strings.Contains(suffix[1:], "?")
+			dsn = "dm://" + userinfo + suffix
+			// The DM driver uses the last '?' as its query separator. When a
+			// credential contains '?' without query options, give it a trailing
+			// empty query so that the credential is not mistaken for the query.
+			if strings.Contains(userinfo, "?") && !hasQuery {
+				dsn += "?"
+			}
+			return strings.TrimSpace(dsn), "dm", nil
 		},
 	})
 }
