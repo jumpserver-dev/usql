@@ -25,13 +25,12 @@ builds:
       - -w -s -X github.com/xo/usql/text.CommandVersion={{.Version}}
     env:
       - CGO_ENABLED=0
+    # The Dameng driver has cipher implementations only for these operating
+    # systems; building FreeBSD/OpenBSD/NetBSD fails in dm/security.
     goos:
       - linux
       - darwin
       - windows
-      - freebsd
-      - openbsd
-      - netbsd
     goarch:
       - amd64
       - arm64
