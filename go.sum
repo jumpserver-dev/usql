@@ -453,6 +453,8 @@ github.com/nathan-fiscaletti/consolesize-go v0.0.0-20220204101620-317176b6684d h
 github.com/nathan-fiscaletti/consolesize-go v0.0.0-20220204101620-317176b6684d/go.mod h1:cxIIfNMTwff8f/ZvRouvWYF6wOoO7nj99neWSx2q/Es=
 github.com/ncruces/go-strftime v0.1.9 h1:bY0MQC28UADQmHmaF5dgpLmImcShSi2kHU9XLdhx/f4=
 github.com/ncruces/go-strftime v0.1.9/go.mod h1:Fwc5htZGVVkseilnfgOVb9mKy6w1naJmn9CehxcKcls=
+github.com/oceanbase/go-oceanbase-driver v1.7.0-oceanbase.1 h1:gPmpZPIhmadIoSrewLtv/U/tZz8yPKwuvsOUq3ExtOQ=
+github.com/oceanbase/go-oceanbase-driver v1.7.0-oceanbase.1/go.mod h1:bEmS9wEJeKtLsYCtwEj61ut+bSPrRFVTfvwaT9mrIqo=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.0 h1:8SG7/vwALn54lVB/0yZ/MMwhFrPYtpEHQb2IpWsCzug=
