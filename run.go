@@ -231,8 +231,18 @@ func New(cliargs []string) ContextExecutor {
 
 func writeAvailableDrivers(w io.Writer) error {
 	available := drivers.Available()
-	names := make([]string, 0, len(available))
+	nameSet := make(map[string]struct{}, len(available))
 	for name := range available {
+		nameSet[name] = struct{}{}
+		// URL aliases are supported by the same registered driver. Include them
+		// so callers can check asset protocols such as mariadb and postgresql.
+		_, aliases := dburl.SchemeDriverAndAliases(name)
+		for _, alias := range aliases {
+			nameSet[alias] = struct{}{}
+		}
+	}
+	names := make([]string, 0, len(nameSet))
+	for name := range nameSet {
 		names = append(names, name)
 	}
 	sort.Strings(names)
