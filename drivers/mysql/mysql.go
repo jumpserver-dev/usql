@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"github.com/xo/dburl"
 	"io"
+	"net"
 	"net/netip"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/go-sql-driver/mysql" // DRIVER
 	"github.com/xo/usql/drivers"
@@ -54,10 +54,6 @@ func init() {
 			url.RawQuery = url.RawQuery + url.RawFragment
 			queryParams := url.Query()
 
-			// If the host is an IPv6 address, it needs to be enclosed in square brackets
-			if hostIp, err1 := netip.ParseAddr(url.Hostname()); err1 == nil && hostIp.Is6() {
-				dsn = strings.Replace(dsn, url.Hostname(), fmt.Sprintf("[%s]", url.Hostname()), 1)
-			}
 			if queryParams.Get("tls") == "custom" {
 
 				sslCA := queryParams.Get("ssl-ca")
@@ -103,7 +99,22 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return sql.Open("mysql", newDSN.DSN)
+			dsn = newDSN.DSN
+			if hostIP, err := netip.ParseAddr(url.Hostname()); err == nil && hostIP.Is6() {
+				// dburl omits IPv6 brackets; repair the final DSN after TLS options
+				// have been processed so URL regeneration cannot discard the fix.
+				cfg, err := mysql.ParseDSN(dsn)
+				if err != nil {
+					return nil, err
+				}
+				port := url.Port()
+				if port == "" {
+					port = "3306"
+				}
+				cfg.Addr = net.JoinHostPort(url.Hostname(), port)
+				dsn = cfg.FormatDSN()
+			}
+			return sql.Open("mysql", dsn)
 		}, nil
 	}
 	drivers.Register("mysql", d, "memsql", "vitess", "tidb")
