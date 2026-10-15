@@ -81,6 +81,7 @@ func (w *WarpRows) Scan(dest ...interface{}) error {
 }
 
 func replaceColumnVal(rule feature.DataMaskingRule, val string) string {
+	characters := []rune(val)
 	switch rule.MaskingMethod {
 	case feature.MaskingMethodFixedChar:
 		// 固定字符替换
@@ -91,26 +92,26 @@ func replaceColumnVal(rule feature.DataMaskingRule, val string) string {
 
 	case feature.MaskingMethodHideMiddle:
 		// 隐藏中间
-		if len(val) < 3 {
+		if len(characters) < 3 {
 			return rule.MaskPattern
 		}
-		return val[:1] + strings.Repeat("*", len(val)-2) + val[len(val)-1:]
+		return string(characters[:1]) + strings.Repeat("*", len(characters)-2) + string(characters[len(characters)-1:])
 
 	case feature.MaskingMethodKeepPrefix:
 		// 保留前缀
 		n := 2
-		if n <= 0 || n >= len(val) {
+		if n <= 0 || n >= len(characters) {
 			return "####"
 		}
-		return val[:n] + strings.Repeat("*", len(val)-n)
+		return string(characters[:n]) + strings.Repeat("*", len(characters)-n)
 
 	case feature.MaskingMethodKeepSuffix:
 		// 保留后缀
 		n := 2
-		if n <= 0 || n >= len(val) {
+		if n <= 0 || n >= len(characters) {
 			return "####"
 		}
-		return strings.Repeat("*", len(val)-n) + val[len(val)-n:]
+		return strings.Repeat("*", len(characters)-n) + string(characters[len(characters)-n:])
 	default:
 		// 未知策略
 		return rule.MaskPattern
