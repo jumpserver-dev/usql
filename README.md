@@ -69,3 +69,7 @@ TLS fixtures do not establish compatibility with a real TLS-enabled Db2 server.
 
 Core's Db2 connection method and KoKo's protocol routing/release version are a
 separate follow-up after this usql version is published.
+
+The [Core SQL driver coverage review](docs/core-sql-driver-coverage.md) records
+the nine current SQL database types, their actual driver packages, vendor versus
+community provenance and the distinction between initialization and live tests.
