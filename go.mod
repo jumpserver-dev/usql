@@ -28,6 +28,7 @@ require (
 	github.com/chzyer/logex v1.1.10 // indirect
 	github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
+	github.com/go-db2/go-db2 v0.0.0-20261015010257-944faf6c05dc
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.7.1 // indirect
 	github.com/gohxs/readline v0.0.0-20171011095936-a780388e6e7c // indirect
@@ -49,7 +50,7 @@ require (
 	github.com/microsoft/go-mssqldb v1.7.1 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/nathan-fiscaletti/consolesize-go v0.0.0-20220204101620-317176b6684d // indirect
-	github.com/oceanbase/go-oceanbase-driver v1.7.0-oceanbase.1 // indirect
+	github.com/oceanbase/go-oceanbase-driver v1.7.0-oceanbase.1
 	github.com/paulmach/orb v0.11.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect

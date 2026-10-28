@@ -6,6 +6,7 @@ import (
 	"os"
 
 	_ "github.com/jumpserver-dev/usql/drivers/dameng"
+	_ "github.com/jumpserver-dev/usql/drivers/db2"
 	_ "github.com/jumpserver-dev/usql/drivers/mysql"
 	_ "github.com/jumpserver-dev/usql/drivers/oceanbase"
 	_ "github.com/jumpserver-dev/usql/store"

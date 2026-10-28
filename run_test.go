@@ -33,7 +33,7 @@ func TestWriteAvailableDrivers(t *testing.T) {
 	}
 	for _, name := range []string{
 		"mysql", "mariadb", "maria", "my", "postgres", "postgresql", "pgsql", "pg",
-		"dameng", "dm", "sqlserver", "mssql", "oracle", "clickhouse", "oceanbase", "oboracle",
+		"dameng", "dm", "db2", "db2s", "sqlserver", "mssql", "oracle", "clickhouse", "oceanbase", "oboracle",
 	} {
 		if !seen[name] {
 			t.Errorf("available drivers %q do not include %q", names, name)
