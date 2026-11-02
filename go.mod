@@ -5,7 +5,9 @@ go 1.26.3
 require (
 	gitee.com/chunanyong/dm v1.8.23
 	github.com/alecthomas/chroma/v2 v2.13.0
+	github.com/chzyer/readline v1.5.1
 	github.com/dlclark/regexp2 v1.11.0
+	github.com/dop251/goja v0.0.0-20261031103838-cf2ff0ec0b31
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/mattn/go-isatty v0.0.20
 	github.com/spf13/cobra v1.8.0
@@ -14,6 +16,18 @@ require (
 	github.com/xo/dburl v0.23.1
 	github.com/xo/tblfmt v0.13.1
 	github.com/xo/usql v0.19.1
+	go.mongodb.org/mongo-driver/v2 v2.4.1
+)
+
+require (
+	github.com/dlclark/regexp2/v2 v2.11.0 // indirect
+	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
+	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
+	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
+	github.com/xdg-go/scram v1.1.2 // indirect
+	github.com/xdg-go/stringprep v1.0.4 // indirect
+	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
+	golang.org/x/sync v0.24.0 // indirect
 )
 
 require (
@@ -25,8 +39,6 @@ require (
 	github.com/ClickHouse/ch-go v0.61.5 // indirect
 	github.com/ClickHouse/clickhouse-go/v2 v2.24.0 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
-	github.com/chzyer/logex v1.1.10 // indirect
-	github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-db2/go-db2 v0.0.0-20261015010257-944faf6c05dc
 	github.com/go-faster/city v1.0.1 // indirect
@@ -35,7 +47,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 // indirect
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
-	github.com/golang/snappy v0.0.4 // indirect
+	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -74,12 +86,11 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.43.0 // indirect
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
-	golang.org/x/mod v0.29.0 // indirect
 	golang.org/x/net v0.45.0 // indirect
 	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/telemetry v0.0.0-20251009181524-91c411e14f39 // indirect
-	golang.org/x/term v0.36.0 // indirect
-	golang.org/x/text v0.30.0 // indirect
+	golang.org/x/term v0.36.0
+	golang.org/x/text v0.43.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
