@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/jumpserver-dev/usql/feature"
 	"github.com/jumpserver-dev/usql/handler"
+	"github.com/jumpserver-dev/usql/mongoshell"
 	"github.com/jumpserver-dev/usql/store"
 	"github.com/xo/usql/metacmd"
 	"io"
@@ -35,6 +36,9 @@ type ContextExecutor interface {
 
 // New builds the command context.
 func New(cliargs []string) ContextExecutor {
+	if mongoshell.IsInvocation(cliargs[1:]) {
+		return mongoshell.New(cliargs[1:], text.CommandVersion)
+	}
 	args := &Args{}
 	var (
 		bashCompletion       bool
@@ -232,6 +236,8 @@ func New(cliargs []string) ContextExecutor {
 func writeAvailableDrivers(w io.Writer) error {
 	available := drivers.Available()
 	nameSet := make(map[string]struct{}, len(available))
+	nameSet["mongodb"] = struct{}{}
+	nameSet["mongodb+srv"] = struct{}{}
 	for name := range available {
 		nameSet[name] = struct{}{}
 		// URL aliases are supported by the same registered driver. Include them

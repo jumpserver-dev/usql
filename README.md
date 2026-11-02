@@ -1,5 +1,57 @@
 # JumpServer usql
 
+## Mongo Shell mode
+
+MongoDB is included in the same pure Go binary. `usql --mongo`, `usql mongo`,
+or a `mongodb://` / `mongodb+srv://` connection string selects the JavaScript
+shell instead of the SQL interpreter. `usql --drivers` advertises both schemes.
+The shell uses the official MongoDB Go driver and Goja, with no Node.js runtime,
+external mongosh process or mongosh encryption library.
+
+The connection accepts `--username` / `-u`, `--password` / `-p` (with no value to
+prompt), `--authenticationDatabase`, `--host`, `--port` and the MongoDB URI options.
+TLS supports `--tls`, `--tlsCAFile`, `--tlsCertificateKeyFile` and explicit
+`--tlsInsecure`. `--no-password` prevents prompting. URI credentials must be URL
+encoded. The `Enter password:` prompt is compatible with KoKo's existing PTY login.
+
+`--eval` / `-c` evaluates JavaScript, `--file` / `-f` or positional `.js` files
+execute scripts, and `--shell` stays interactive afterwards. Repeated `--eval`
+arguments share variables and only print the last result. `--nodb` starts a local
+JavaScript session. `--quiet`, `--norc`, `--json=canonical` and `--json=relaxed`
+are supported. Interactive input has history, lexical completion, multiline input
+and Ctrl-C cancellation. `~/.mongoshrc.js` is loaded unless `--norc` is specified.
+
+Supported shell operations include:
+
+- `use`, `show dbs`, `show collections`, `show users`, `show roles`, `help`, `it`, `exit`.
+- Persistent JavaScript variables, functions and loops; `print`, `printjson`, `load`,
+  `assert`, `JSON`, `EJSON`, ObjectId, NumberLong, NumberInt, NumberDecimal, ISODate,
+  Timestamp, BinData, UUID, MinKey and MaxKey. Int64 values retain their precision.
+- CRUD, aggregation, distinct/count, find-and-modify, bulkWrite, collection/index
+  management, database statistics and user/role helpers.
+- Cursor sort/skip/limit/projection/hint/collation, pagination, next/hasNext,
+  toArray/forEach/map, explain and close. The Go driver retains each cursor's
+  server and session across getMore requests.
+- `db.getSiblingDB()`, `db.runCommand()`, `db.adminCommand()`, common `rs` and `sh`
+  helpers. Other server commands can be issued with `runCommand`.
+
+This is a compatibility implementation, not the official mongosh runtime. Node.js
+APIs/npm snippets, general async/await, session/transaction helpers, connection
+switching via `Mongo()` / `db.auth()` and client-side field encryption are not
+implemented. A leading `await db...` is accepted because database operations are
+synchronous. Human-readable output is similar to mongosh; it is not byte-identical.
+SQL and Mongo modes are selected at startup rather than via cross-mode `\\connect`.
+`toArray()` is capped at 10,000 documents; use a limit or stream with `forEach`.
+Each evaluation is cancellable and has a two-minute timeout.
+
+KoKo HTTP CONNECT gateways use `USQL_MONGO_PROXY` (or `ALL_PROXY`, `HTTP_PROXY`,
+`HTTPS_PROXY`, in that order). Proxy URLs must use HTTP without embedded credentials.
+Data masking query options are rejected explicitly in Mongo mode.
+
+The live integration test uses `USQL_MONGO_TEST_URI` pointing at a disposable
+MongoDB instance. It creates and removes a uniquely named test database and checks
+CRUD, aggregation, BSON round trips, multi-batch cursors and write results.
+
 ## Db2 LUW
 
 Db2 is compiled into the normal `CGO_ENABLED=0` binary on every supported target.
