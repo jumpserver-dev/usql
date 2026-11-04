@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/jumpserver-dev/usql/feature"
 	"github.com/jumpserver-dev/usql/handler"
+	"github.com/jumpserver-dev/usql/internal/nosql"
 	"github.com/jumpserver-dev/usql/store"
 	"github.com/xo/usql/metacmd"
 	"io"
@@ -241,6 +242,11 @@ func writeAvailableDrivers(w io.Writer) error {
 			nameSet[alias] = struct{}{}
 		}
 	}
+	// These native sessions use the same binary and terminal, without passing
+	// document/RESP commands through database/sql or the SQL statement parser.
+	for _, name := range []string{"mongodb", "mongodb+srv", "redis", "rediss"} {
+		nameSet[name] = struct{}{}
+	}
 	names := make([]string, 0, len(nameSet))
 	for name := range nameSet {
 		names = append(names, name)
@@ -348,10 +354,34 @@ func Run(ctx context.Context, args *Args, connections map[string]interface{}, in
 		return err
 	}
 	defer l.Close()
+	dsn := args.DSN
+	if named, ok := env.Cget(dsn); ok && len(named) == 1 {
+		dsn = named[0]
+	}
+	if nosql.IsDSN(dsn) {
+		if args.SingleTransaction {
+			return errors.New("--single-transaction is supported by SQL sessions only")
+		}
+		format, _ := env.Pget("format")
+		if format != "aligned" && format != "unaligned" && format != "json" {
+			return fmt.Errorf("%s output is supported by SQL sessions only", format)
+		}
+		config := nosql.Config{
+			DSN: dsn, ForcePassword: args.ForcePassword, NoPassword: args.NoPassword,
+			JSON: format == "json", Quiet: env.Get("QUIET") == "on",
+			StopOnError: env.Get("ON_ERROR_STOP") == "on",
+		}
+		for _, input := range args.CommandOrFiles {
+			config.Inputs = append(config.Inputs, nosql.Input{Command: input.Command, Value: input.Value})
+		}
+		if !args.NoInit {
+			config.StartupFile, config.Init = env.RCFile(u), initstr
+		}
+		return nosql.Run(ctx, l, config)
+	}
 	// create handler
 	h := handler.New(l, u, wd, args.NoPassword)
 	// force password
-	dsn := args.DSN
 	if args.ForcePassword {
 		if dsn, err = h.Password(dsn); err != nil {
 			return err

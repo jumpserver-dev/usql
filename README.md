@@ -1,5 +1,79 @@
 # JumpServer usql
 
+## MongoDB and Redis
+
+MongoDB and Redis are native session modes in the normal `CGO_ENABLED=0` usql
+binary. They do not launch `mongosh`, `redis-cli`, Node.js or another process.
+Use a MongoDB/Redis URL when starting usql; `--drivers` advertises `mongodb`,
+`mongodb+srv`, `redis` and `rediss` as well as the existing SQL drivers.
+
+```sh
+usql 'mongodb://USER@HOST:27017/test?authSource=admin' --password
+usql 'redis://USER@HOST:6379/0' --password
+usql 'rediss://USER@HOST:6380/0?tls-ca=/path/ca.pem' --password
+```
+
+`--password` reads a password without echoing it or putting it in process
+arguments. URLs also accept percent-encoded credentials. `--no-password`
+disables automatic interactive prompting. Both modes share usql's terminal,
+history, completion, `-c`, `-f`, piped input, `-o`, `-q`, `-X` and `-J` entry
+points. Commands execute on Enter without an SQL semicolon. MongoDB accepts
+semicolons between commands and multiline documents; Redis treats semicolons
+as argument bytes. `exit`, `quit`, `\q` and EOF close the session. `help` lists
+the supported mode's commands. SQL transaction and SQL table-format options
+are rejected for these sessions. Cross-mode `\c` switching and data masking
+are not implemented; configured masking rules are rejected explicitly.
+
+MongoDB combines the pinned `github.com/bytebase/gomongo` helpers with the
+MongoDB Go driver v2 and an embedded pure-Go Goja JavaScript engine. It supports
+variables, functions, loops, BSON/EJSON, script files and `load()`, streaming
+cursors with `it`, bulk writes, sessions/transactions, change streams,
+users/roles, replica-set and sharding helpers. No external JavaScript runtime
+is installed. Results use canonical Extended JSON to preserve BSON precision.
+See [MongoDB shell compatibility](docs/mongodb-shell.md) for supported APIs,
+script behavior, tested topologies and explicit compatibility limits.
+
+SRV, replica-set and TLS options pass through to the Go driver. A
+`proxy=http://HOST:PORT` (or HTTPS) query parameter tunnels every discovered
+server connection through an HTTP CONNECT gateway.
+
+Redis uses `github.com/redis/go-redis/v9`. Quoted arguments support empty
+strings, Unicode, `\n`, `\r`, `\t` and binary `\xHH` escapes. A dedicated
+connection preserves `SELECT`, `AUTH`, `WATCH` and `MULTI`/`EXEC`/`DISCARD`
+state. `AUTH` and `SELECT` must be issued outside `MULTI`. Commands are not
+automatically retried after connection errors. Ctrl-C cancels blocking commands;
+the session reconnects using its selected database and credentials and discards
+transaction/watch state. `SUBSCRIBE`, `PSUBSCRIBE`, `SSUBSCRIBE` and `MONITOR`
+stream until Ctrl-C. MONITOR uses the explicitly connected node. `HELLO`,
+`RESET` and replication-stream commands are rejected because they change the
+response protocol. `-J` emits JSON; the default output uses raw values.
+
+For Cluster routing, set `cluster=true` in the Redis URL and use database 0.
+The Go driver discovers nodes and follows MOVED/ASK redirects. Stateful
+`AUTH`, `SELECT`, `WATCH` and transaction commands require a direct node
+connection without `cluster=true`. Sentinel discovery is not implemented.
+`rediss://` validates TLS by default and accepts `tls-ca`, paired `tls-cert`
+and `tls-key`, and `tls-server-name`. `tls-insecure=true` explicitly disables
+certificate verification. No TLS option is accepted on a plain `redis://` URL.
+
+The gomongo/omni module graph also raises versions of shared SQL driver
+dependencies (MySQL, SQL Server and Oracle). The existing SQL tests and Core
+driver initialization checks are retained; these checks do not replace live
+regression testing against every SQL engine.
+
+Opt-in isolated integration tests create and remove their own temporary MongoDB
+database and Redis keys. The two private files below contain test-only URLs:
+
+```sh
+USQL_MONGODB_TEST_DSN_FILE=/path/to/private-mongodb-dsn \
+USQL_REDIS_TEST_DSN_FILE=/path/to/private-redis-dsn \
+  GOMAXPROCS=2 go test -p 2 ./internal/nosql -run TestLive -v
+```
+
+`USQL_MONGODB_TLS_TEST_DSN_FILE` and `USQL_REDIS_TLS_TEST_DSN_FILE` additionally
+enable TLS trust checks. The Redis TLS fixture requires a client certificate
+and validates the `tls-cert` / `tls-key` pair as well as server trust.
+
 ## Db2 LUW
 
 Db2 is compiled into the normal `CGO_ENABLED=0` binary on every supported target.
