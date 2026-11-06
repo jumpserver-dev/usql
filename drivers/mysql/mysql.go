@@ -6,14 +6,15 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"fmt"
-	"github.com/xo/dburl"
 	"io"
 	"net"
 	"net/netip"
+	"net/url"
 	"os"
 	"strconv"
 
 	"github.com/go-sql-driver/mysql" // DRIVER
+	"github.com/xo/dburl"
 	"github.com/xo/usql/drivers"
 	"github.com/xo/usql/drivers/metadata"
 	mymeta "github.com/xo/usql/drivers/metadata/mysql"
@@ -49,73 +50,89 @@ func init() {
 		NewCompleter: mymeta.NewCompleter,
 	}
 
-	d.Open = func(ctx context.Context, url *dburl.URL, f func() io.Writer, f2 func() io.Writer) (func(string, string) (*sql.DB, error), error) {
+	d.Open = func(ctx context.Context, source *dburl.URL, f func() io.Writer, f2 func() io.Writer) (func(string, string) (*sql.DB, error), error) {
 		return func(_, dsn string) (*sql.DB, error) {
-			url.RawQuery = url.RawQuery + url.RawFragment
-			queryParams := url.Query()
-
+			u := *source // Retry/password prompts must not mutate a shared URL.
+			u.RawQuery += u.RawFragment
+			queryParams := u.Query()
+			var customTLS *tls.Config
 			if queryParams.Get("tls") == "custom" {
-
-				sslCA := queryParams.Get("ssl-ca")
-				sslCert := queryParams.Get("ssl-cert")
-				sslKey := queryParams.Get("ssl-key")
-
-				queryParams.Del("ssl-ca")
-				queryParams.Del("ssl-cert")
-				queryParams.Del("ssl-key")
-
-				rootCertPool := x509.NewCertPool()
-
-				tlsConfig := &tls.Config{
-					InsecureSkipVerify: true,
-				}
-
-				if sslCA != "" {
-					pem, err := os.ReadFile(sslCA)
-					if err != nil {
-						return nil, fmt.Errorf("failed to read CA cert: %v", err)
-					}
-					if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
-						return nil, fmt.Errorf("failed to append CA cert to pool")
-					}
-					tlsConfig.RootCAs = rootCertPool
-				}
-
-				if sslCert != "" && sslKey != "" {
-					certs, err := tls.LoadX509KeyPair(sslCert, sslKey)
-					if err != nil {
-						return nil, fmt.Errorf("failed to load client cert and key: %v", err)
-					}
-					tlsConfig.Certificates = []tls.Certificate{certs}
-				}
-				err := mysql.RegisterTLSConfig("custom", tlsConfig)
+				var err error
+				customTLS, err = connectionTLS(queryParams, u.Hostname())
 				if err != nil {
-					return nil, fmt.Errorf("failed to register custom TLS config: %v", err)
+					return nil, err
+				}
+				for _, key := range []string{"tls", "ssl-ca", "ssl-cert", "ssl-key", "ssl-server-name", "ssl-insecure"} {
+					queryParams.Del(key)
 				}
 			}
 
-			url.RawQuery = queryParams.Encode()
-			newDSN, err := dburl.Parse(url.String())
+			u.RawQuery = queryParams.Encode()
+			newDSN, err := dburl.Parse(u.String())
 			if err != nil {
 				return nil, err
 			}
 			dsn = newDSN.DSN
-			if hostIP, err := netip.ParseAddr(url.Hostname()); err == nil && hostIP.Is6() {
+			cfg, err := mysql.ParseDSN(dsn)
+			if err != nil {
+				return nil, err
+			}
+			if hostIP, err := netip.ParseAddr(u.Hostname()); err == nil && hostIP.Is6() {
 				// dburl omits IPv6 brackets; repair the final DSN after TLS options
 				// have been processed so URL regeneration cannot discard the fix.
-				cfg, err := mysql.ParseDSN(dsn)
-				if err != nil {
-					return nil, err
-				}
-				port := url.Port()
+				port := u.Port()
 				if port == "" {
 					port = "3306"
 				}
-				cfg.Addr = net.JoinHostPort(url.Hostname(), port)
-				dsn = cfg.FormatDSN()
+				cfg.Addr = net.JoinHostPort(u.Hostname(), port)
 			}
-			return sql.Open("mysql", dsn)
+			if customTLS != nil {
+				cfg.TLS = customTLS
+			}
+			// A TLS config belongs to one connector, not the process-wide
+			// "custom" registry entry shared by unrelated connections.
+			connector, err := mysql.NewConnector(cfg)
+			if err != nil {
+				return nil, err
+			}
+			return sql.OpenDB(connector), nil
 		}, nil
 	}
 	drivers.Register("mysql", d, "memsql", "vitess", "tidb")
+}
+
+func connectionTLS(params url.Values, host string) (*tls.Config, error) {
+	cfg := &tls.Config{MinVersion: tls.VersionTLS12, ServerName: host}
+	if name := params.Get("ssl-server-name"); name != "" {
+		cfg.ServerName = name
+	}
+	if skip := params.Get("ssl-insecure"); skip != "" {
+		var err error
+		cfg.InsecureSkipVerify, err = strconv.ParseBool(skip)
+		if err != nil {
+			return nil, fmt.Errorf("invalid ssl-insecure setting")
+		}
+	}
+	if ca := params.Get("ssl-ca"); ca != "" {
+		data, err := os.ReadFile(ca)
+		if err != nil {
+			return nil, fmt.Errorf("cannot read database CA certificate")
+		}
+		cfg.RootCAs = x509.NewCertPool()
+		if !cfg.RootCAs.AppendCertsFromPEM(data) {
+			return nil, fmt.Errorf("invalid database CA certificate PEM")
+		}
+	}
+	cert, key := params.Get("ssl-cert"), params.Get("ssl-key")
+	if (cert == "") != (key == "") {
+		return nil, fmt.Errorf("database client certificate and key must be configured together")
+	}
+	if cert != "" {
+		pair, err := tls.LoadX509KeyPair(cert, key)
+		if err != nil {
+			return nil, fmt.Errorf("invalid database client certificate/key")
+		}
+		cfg.Certificates = []tls.Certificate{pair}
+	}
+	return cfg, nil
 }

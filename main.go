@@ -9,10 +9,10 @@ import (
 	_ "github.com/jumpserver-dev/usql/drivers/db2"
 	_ "github.com/jumpserver-dev/usql/drivers/mysql"
 	_ "github.com/jumpserver-dev/usql/drivers/oceanbase"
+	_ "github.com/jumpserver-dev/usql/drivers/postgres"
 	_ "github.com/jumpserver-dev/usql/store"
 	_ "github.com/xo/usql/drivers/clickhouse"
 	_ "github.com/xo/usql/drivers/oracle"
-	_ "github.com/xo/usql/drivers/postgres"
 	_ "github.com/xo/usql/drivers/sqlserver"
 )
 

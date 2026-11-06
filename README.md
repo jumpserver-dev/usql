@@ -1,5 +1,26 @@
 # JumpServer usql
 
+## MySQL and PostgreSQL TLS
+
+MySQL `tls=custom` validates the server certificate and hostname by default.
+Use `ssl-ca=/path/ca.pem` for an explicit CA bundle and paired `ssl-cert` /
+`ssl-key` for mutual TLS. `ssl-server-name=db.example.com` keeps the database's
+certificate identity when the socket is an SSH forward. Only explicit
+`ssl-insecure=true` disables verification; it does not permit plaintext fallback.
+Each connection has its own TLS configuration rather than a global named entry.
+
+PostgreSQL retains its metadata, COPY and notice support. `hostaddr=127.0.0.1`
+selects a tunnel's dial address while the URL hostname remains the TLS identity.
+`sslmode=verify-full` verifies CA and hostname; `verify-ca` verifies the chain
+without requiring a matching hostname. `require` requires encryption and also
+verifies the chain when `sslrootcert` is explicitly supplied. `prefer` retries
+without encryption only after an explicit server SSLRequest refusal, not after
+certificate or authentication failures. Explicit CA-only modes keep SNI and
+require explicitly paired client certificate/key options when mutual TLS is used.
+With no explicit CA, verification uses system roots. Cancellation uses the same
+configured TLS/dial route. None of these options imply client-to-Magnus TLS;
+that is configured separately from the database asset's backend SSL setting.
+
 ## MongoDB and Redis
 
 MongoDB and Redis are native session modes in the normal `CGO_ENABLED=0` usql
