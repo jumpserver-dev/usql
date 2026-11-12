@@ -169,9 +169,7 @@ func Run(ctx context.Context, terminal rline.IO, config Config) error {
 		}
 		if parseErr == nil {
 			for _, statement := range statements {
-				if terminal.Interactive() && !sensitive(statement, r.mongo) {
-					_ = terminal.Save(statement)
-				}
+				r.saveHistory(statement)
 				if err = r.execute(statement); err != nil {
 					if errors.Is(err, errQuit) {
 						return nil
@@ -199,6 +197,20 @@ type runner struct {
 	config   Config
 	mongo    bool
 	lastErr  error
+}
+
+func (r *runner) saveHistory(statement string) {
+	if !r.terminal.Interactive() || sensitive(statement, r.mongo) {
+		return
+	}
+	// Readline edits physical lines, not whole JavaScript programs. In particular,
+	// the newline appended by the input loop must never be recalled into its buffer.
+	for _, line := range strings.Split(statement, "\n") {
+		line = strings.TrimSuffix(line, "\r")
+		if strings.TrimSpace(line) != "" {
+			_ = r.terminal.Save(line)
+		}
+	}
 }
 
 func (r *runner) finish(err error) error {

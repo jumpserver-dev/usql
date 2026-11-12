@@ -7,6 +7,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"io"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -89,6 +90,34 @@ func TestAuthenticationHistoryAndPasswordPolicy(t *testing.T) {
 	terminal := &rline.Rline{Out: io.Discard, Err: io.Discard, Pw: func(string) (string, error) { return "", errors.New("password requested") }}
 	if err := Run(context.Background(), terminal, Config{DSN: "redis://localhost/0", ForcePassword: true}); err == nil || err.Error() != "password requested" {
 		t.Fatalf("forced password err=%v", err)
+	}
+}
+
+func TestHistoryStoresEditableLinesWithoutCredentials(t *testing.T) {
+	for _, test := range []struct {
+		name, command string
+		mongo         bool
+		want          []string
+	}{
+		{"MongoDB", "db.version()\n", true, []string{"db.version()"}},
+		{"multiline", "if (true) {\r\n  print('ok');\r\n}\r\n", true, []string{"if (true) {", "  print('ok');", "}"}},
+		{"blank", "\n \r\n", true, nil},
+		{"Redis", "PING", false, []string{"PING"}},
+		{"MongoDB credentials", "db.auth({\nuser:'test',\npwd:'secret'\n})\n", true, nil},
+		{"Redis credentials", "AUTH secret", false, nil},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var saved []string
+			terminal := &rline.Rline{Int: true, S: func(line string) error {
+				saved = append(saved, line)
+				return nil
+			}}
+			r := &runner{terminal: terminal, mongo: test.mongo}
+			r.saveHistory(test.command)
+			if !reflect.DeepEqual(saved, test.want) {
+				t.Fatalf("history=%q, want %q", saved, test.want)
+			}
+		})
 	}
 }
 
