@@ -65,7 +65,8 @@ state. `AUTH` and `SELECT` must be issued outside `MULTI`. Commands are not
 automatically retried after connection errors. Ctrl-C cancels blocking commands;
 the session reconnects using its selected database and credentials and discards
 transaction/watch state. `SUBSCRIBE`, `PSUBSCRIBE`, `SSUBSCRIBE` and `MONITOR`
-stream until Ctrl-C. MONITOR uses the explicitly connected node. `HELLO`,
+stream until Ctrl-C. MONITOR uses the explicitly connected node, or all masters
+with `cluster=true` (each line identifies its source node). `HELLO`,
 `RESET` and replication-stream commands are rejected because they change the
 response protocol. `-J` emits JSON; the default output uses raw values.
 
@@ -73,6 +74,15 @@ For Cluster routing, set `cluster=true` in the Redis URL and use database 0.
 The Go driver discovers nodes and follows MOVED/ASK redirects. Stateful
 `AUTH`, `SELECT`, `WATCH` and transaction commands require a direct node
 connection without `cluster=true`. Sentinel discovery is not implemented.
+`DBSIZE`, `KEYS`, `SCAN`, and the keyspace section of `INFO` aggregate masters
+only, not replicas. `\cluster info` shows per-master slots, key counts and the
+total. `SCAN` returns opaque session-local cursors, valid for five minutes
+(up to 1024 checkpoints); restart with `SCAN 0` after topology changes or
+cursor expiry. Scans are not an atomic snapshot. `KEYS` uses bounded scans and
+fails explicitly above 10000 keys or 8 MiB; use `SCAN` for larger databases.
+Cluster MONITOR checks topology every five seconds and stops explicitly if a
+master disconnects or topology changes; restart it instead of accepting partial
+coverage. Ctrl-C closes only stream/discovery connections, not the command pool.
 `rediss://` validates TLS by default and accepts `tls-ca`, paired `tls-cert`
 and `tls-key`, and `tls-server-name`. `tls-insecure=true` explicitly disables
 certificate verification. No TLS option is accepted on a plain `redis://` URL.
