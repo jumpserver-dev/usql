@@ -14,6 +14,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -26,6 +27,7 @@ type redisSession struct {
 	cluster *redis.ClusterClient
 	json    bool
 	multi   bool
+	scans   map[uint64]clusterScanState
 }
 
 func redisOptions(u *url.URL) (*redis.Options, bool, error) {
@@ -250,7 +252,7 @@ func (s *redisSession) Execute(ctx context.Context, w io.Writer, line string) er
 	if s.cluster != nil {
 		client := s.cluster
 		stop := context.AfterFunc(ctx, func() { _ = client.Close() })
-		result, err := s.cluster.Do(ctx, args...).Result()
+		result, err := s.clusterExecute(ctx, command, args)
 		if !stop() || ctx.Err() != nil {
 			_ = client.Close()
 			s.connectCluster()
@@ -312,19 +314,24 @@ func (s *redisSession) Execute(ctx context.Context, w io.Writer, line string) er
 // MONITOR emits a continuous RESP2 stream. A separate connection keeps the
 // command session usable after cancellation and avoids driver pool reuse of a
 // connection that still has unsolicited replies pending.
-func (s *redisSession) monitor(ctx context.Context, w io.Writer) error {
+func (s *redisSession) openMonitor(ctx context.Context, address string) (net.Conn, *bufio.Reader, error) {
 	dialer := &net.Dialer{Timeout: s.options.DialTimeout}
 	var conn net.Conn
 	var err error
 	if s.options.TLSConfig != nil {
-		conn, err = (&tls.Dialer{NetDialer: dialer, Config: s.options.TLSConfig.Clone()}).DialContext(ctx, "tcp", s.options.Addr)
+		conn, err = (&tls.Dialer{NetDialer: dialer, Config: s.options.TLSConfig.Clone()}).DialContext(ctx, "tcp", address)
 	} else {
-		conn, err = dialer.DialContext(ctx, "tcp", s.options.Addr)
+		conn, err = dialer.DialContext(ctx, "tcp", address)
 	}
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	defer conn.Close()
+	success := false
+	defer func() {
+		if !success {
+			_ = conn.Close()
+		}
+	}()
 	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
 	defer stop()
 	reader := bufio.NewReader(conn)
@@ -349,43 +356,123 @@ func (s *redisSession) monitor(ctx context.Context, w io.Writer) error {
 		}
 		return nil
 	}
-	if s.options.Password != "" {
+	if s.options.Password != "" || s.options.Username != "" && s.options.Username != "default" {
 		if s.options.Username != "" {
 			err = request("AUTH", s.options.Username, s.options.Password)
 		} else {
 			err = request("AUTH", s.options.Password)
 		}
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 	}
 	if s.options.DB != 0 {
 		if err = request("SELECT", strconv.Itoa(s.options.DB)); err != nil {
-			return err
+			return nil, nil, err
 		}
 	}
 	if err = request("MONITOR"); err != nil {
-		return err
+		return nil, nil, err
 	}
 	if err = conn.SetDeadline(time.Time{}); err != nil {
-		return err
+		return nil, nil, err
 	}
-	if err = s.write(w, "OK"); err != nil {
-		return err
-	}
-	for {
-		line, err := readMonitorLine(reader)
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
+	success = true
+	return conn, reader, nil
+}
+
+func (s *redisSession) monitor(ctx context.Context, w io.Writer) error {
+	addresses := []string{s.options.Addr}
+	var masters []clusterMaster
+	if s.cluster != nil {
+		var err error
+		masters, err = s.clusterMasters(ctx)
 		if err != nil {
 			return err
 		}
-		if !strings.HasPrefix(line, "+") {
-			return errors.New("unexpected Redis MONITOR response")
+		addresses = addresses[:0]
+		for _, master := range masters {
+			addresses = append(addresses, master.addr)
 		}
-		if err = s.write(w, strings.TrimPrefix(line, "+")); err != nil {
-			return err
+	}
+	streamCtx, cancel := context.WithCancel(ctx)
+	connections := make([]net.Conn, 0, len(addresses))
+	var workers sync.WaitGroup
+	defer func() {
+		cancel()
+		for _, conn := range connections {
+			_ = conn.Close()
+		}
+		workers.Wait()
+	}()
+	type event struct {
+		address, line string
+		err           error
+	}
+	events := make(chan event)
+	if len(masters) > 0 {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			s.watchMonitor(streamCtx, masters, func(err error) {
+				select {
+				case events <- event{err: err, address: "topology"}:
+				case <-streamCtx.Done():
+				}
+			})
+		}()
+	}
+	for _, address := range addresses {
+		conn, reader, err := s.openMonitor(streamCtx, address)
+		if err != nil {
+			return fmt.Errorf("MONITOR node %s: %w", address, err)
+		}
+		connections = append(connections, conn)
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			stop := context.AfterFunc(streamCtx, func() { _ = conn.Close() })
+			defer stop()
+			for {
+				line, err := readMonitorLine(reader)
+				select {
+				case events <- event{address, line, err}:
+				case <-streamCtx.Done():
+					return
+				}
+				if err != nil {
+					return
+				}
+			}
+		}()
+	}
+	if err := s.write(w, "OK"); err != nil {
+		return err
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case event := <-events:
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if event.err != nil {
+				return fmt.Errorf("MONITOR node %s disconnected: %w", event.address, event.err)
+			}
+			if !strings.HasPrefix(event.line, "+") {
+				return errors.New("unexpected Redis MONITOR response")
+			}
+			line := strings.TrimPrefix(event.line, "+")
+			if s.cluster != nil {
+				line = "[" + event.address + "] " + line
+			}
+			if err := s.write(w, line); err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				return err
+			}
 		}
 	}
 }
@@ -420,6 +507,13 @@ func (s *redisSession) write(w io.Writer, value any) error {
 		_, err := fmt.Fprintln(w, "(nil)")
 		return err
 	case []any:
+		for _, item := range value {
+			if err := s.write(w, item); err != nil {
+				return err
+			}
+		}
+		return nil
+	case []string:
 		for _, item := range value {
 			if err := s.write(w, item); err != nil {
 				return err

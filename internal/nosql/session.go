@@ -102,7 +102,7 @@ func Run(ctx context.Context, terminal rline.IO, config Config) error {
 		if r.mongo {
 			words = append(words, "show dbs", "show collections", "use", "db.runCommand", "db.getCollection", "db.stats()", "db.version()")
 		} else {
-			words = append(words, "PING", "GET", "SET", "DEL", "SCAN", "HGETALL", "INFO", "SELECT", "MULTI", "EXEC", "DISCARD", "SUBSCRIBE", "PSUBSCRIBE", "MONITOR")
+			words = append(words, "PING", "GET", "SET", "DEL", "SCAN", "HGETALL", "INFO", "SELECT", "MULTI", "EXEC", "DISCARD", "SUBSCRIBE", "PSUBSCRIBE", "MONITOR", `\cluster info`)
 		}
 		items := make([]readline.PrefixCompleterInterface, 0, len(words))
 		for _, word := range words {
@@ -233,7 +233,7 @@ func (r *runner) execute(statement string) error {
 			_, err := fmt.Fprintln(r.terminal.Stdout(), "MongoDB: use <database>; show dbs; show collections; db.<collection>.<method>(...); db.runCommand({...}).\nJavaScript, BSON/EJSON, load(), cursors (it/toArray/forEach), bulk writes, sessions/transactions, change streams, users/roles and rs/sh helpers are available. Node.js modules and client-side field encryption are not included. See README for compatibility limits.")
 			return err
 		}
-		_, err := fmt.Fprintln(r.terminal.Stdout(), "Redis: enter Redis commands with quoted arguments and \\n/\\r/\\t/\\xHH escapes. SELECT, MULTI/EXEC and WATCH use a persistent connection; pub/sub and MONITOR stream until Ctrl-C. URL option cluster=true enables Cluster routing; session-state commands require a direct node connection.")
+		_, err := fmt.Fprintln(r.terminal.Stdout(), "Redis: enter Redis commands with quoted arguments and \\n/\\r/\\t/\\xHH escapes. SELECT, MULTI/EXEC and WATCH use a persistent connection; pub/sub and MONITOR stream until Ctrl-C. URL option cluster=true enables Cluster routing, global DBSIZE/KEYS/SCAN and INFO keyspace; \\cluster info shows per-master statistics. Stateful Cluster commands require a direct node connection.")
 		return err
 	}
 	ctx, stop := signal.NotifyContext(r.ctx, os.Interrupt)
