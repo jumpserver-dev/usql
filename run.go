@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -262,7 +263,7 @@ func writeAvailableDrivers(w io.Writer) error {
 }
 
 // Run runs the application.
-func Run(ctx context.Context, args *Args, connections map[string]interface{}, initstr string) error {
+func Run(ctx context.Context, args *Args, connections map[string]interface{}, initstr string) (runErr error) {
 	// get user
 	u, err := user.Current()
 	if err != nil {
@@ -412,7 +413,13 @@ func Run(ctx context.Context, args *Args, connections map[string]interface{}, in
 		if err := json.Unmarshal([]byte(rulesJson), &rules); err != nil {
 			return err
 		}
+		rules = slices.DeleteFunc(rules, func(r feature.DataMaskingRule) bool { return !r.Enabled() })
 		store.GetGlobalStore().Set(feature.DataMaskingKey, rules)
+		if len(rules) != 0 {
+			h.MaskDiagnostics()
+			// Non-interactive failures and the last error at EOF reach main's logger.
+			defer func() { runErr = h.DiagnosticError(runErr) }()
+		}
 		// 删除某个参数
 		values.Del(feature.DataMaskingKey)
 		// 如果还剩参数就重新拼回 DSN

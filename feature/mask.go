@@ -1,10 +1,23 @@
 package feature
 
+import (
+	"strings"
+	"unicode"
+)
+
 type DataMaskingRule struct {
+	IsActive      *bool  `json:"is_active,omitempty"`
 	Name          string `json:"name"`
 	FieldsPattern string `json:"fields_pattern"`
 	MaskPattern   string `json:"mask_pattern"`
 	MaskingMethod string `json:"masking_method"`
+}
+
+// Older callers send only active rules and omit is_active.
+func (r DataMaskingRule) Enabled() bool {
+	return (r.IsActive == nil || *r.IsActive) && strings.ContainsFunc(r.FieldsPattern, func(c rune) bool {
+		return c != ',' && !unicode.IsSpace(c)
+	})
 }
 
 const DataMaskingKey = "data-masking-rules"
