@@ -74,9 +74,10 @@ type Handler struct {
 	// bind are bound values for exec statements
 	bind []interface{}
 	// connection
-	u  *dburl.URL
-	db *sql.DB
-	tx *sql.Tx
+	u    *dburl.URL
+	db   *sql.DB
+	conn *sessionConn
+	tx   *sql.Tx
 	// out file or pipe
 	out io.WriteCloser
 }
@@ -683,10 +684,13 @@ func (h *Handler) URL() *dburl.URL {
 	return h.u
 }
 
-// DB returns the sql.DB for the handler.
+// DB returns the active transaction, dedicated session, or connection pool.
 func (h *Handler) DB() drivers.DB {
 	if h.tx != nil {
 		return h.tx
+	}
+	if h.conn != nil {
+		return h.conn
 	}
 	return h.db
 }
@@ -753,26 +757,31 @@ func (h *Handler) Open(ctx context.Context, params ...string) error {
 		}
 
 	}
+	u := h.u
+	var err error
 	if ctx.Value("CHANGE_DATABASE") != "1" {
 		if len(params) < 2 {
 			dsn := params[0]
 			// parse dsn
-			u, err := dburl.Parse(dsn)
+			u, err = dburl.Parse(dsn)
 			if err != nil {
 				return err
 			}
-			h.u = u
 			// force parameters
-			h.forceParams(h.u)
+			h.forceParams(u)
 		} else {
-			h.u = &dburl.URL{
+			u = &dburl.URL{
 				Driver: params[0],
 				DSN:    strings.Join(params[1:], " "),
 			}
 		}
 	}
+	// Release the previous session only after validating the new URL.
+	if err = h.Close(); err != nil {
+		return err
+	}
+	h.u = u
 	// open connection
-	var err error
 	h.db, err = drivers.Open(ctx, h.u, h.GetOutput, h.l.Stderr)
 	if err != nil && !drivers.IsPasswordErr(h.u, err) {
 		defer h.Close()
@@ -783,7 +792,15 @@ func (h *Handler) Open(ctx context.Context, params ...string) error {
 	// force error/check connection
 	if err == nil {
 		if err = drivers.Ping(ctx, h.u, h.db); err == nil {
-			return h.Version(ctx)
+			if h.u.Driver == "sqlserver" {
+				var conn *sql.Conn
+				if conn, err = h.db.Conn(ctx); err == nil {
+					h.conn = &sessionConn{conn}
+				}
+			}
+			if err == nil {
+				return h.Version(ctx)
+			}
 		}
 	}
 	// bail without getting password
@@ -936,7 +953,15 @@ func (h *Handler) Close() error {
 		return text.ErrPreviousTransactionExists
 	}
 	if h.db != nil {
-		err := h.db.Close()
+		var err error
+		if h.conn != nil {
+			err = h.conn.Close()
+			if errors.Is(err, sql.ErrConnDone) {
+				err = nil
+			}
+			h.conn = nil
+		}
+		err = errors.Join(err, h.db.Close())
 		drv := h.u.Driver
 		h.db, h.u = nil, nil
 		return drivers.WrapErr(drv, err)
@@ -1436,7 +1461,11 @@ func (h *Handler) BeginTx(ctx context.Context, txOpts *sql.TxOptions) error {
 		return text.ErrPreviousTransactionExists
 	}
 	var err error
-	h.tx, err = h.db.BeginTx(ctx, txOpts)
+	if h.conn != nil {
+		h.tx, err = h.conn.BeginTx(ctx, txOpts)
+	} else {
+		h.tx, err = h.db.BeginTx(ctx, txOpts)
+	}
 	if err != nil {
 		return drivers.WrapErr(h.u.Driver, err)
 	}
@@ -1523,10 +1552,10 @@ func (h *Handler) Include(path string, relative bool) error {
 		Pw:  h.l.Password,
 	}
 	p := New(l, h.user, filepath.Dir(path), h.nopw)
-	p.db, p.u = h.db, h.u
+	p.db, p.u, p.conn, p.tx = h.db, h.u, h.conn, h.tx
 	drivers.ConfigStmt(p.u, p.buf)
 	err = p.Run()
-	h.db, h.u = p.db, p.u
+	h.db, h.u, h.conn, h.tx = p.db, p.u, p.conn, p.tx
 	return err
 }
 
@@ -1535,7 +1564,7 @@ func (h *Handler) MetadataWriter(ctx context.Context) (metadata.Writer, error) {
 	if h.db == nil {
 		return nil, text.ErrNotConnected
 	}
-	return drivers.NewMetadataWriter(ctx, h.u, h.db, h.l.Stdout(), readerOpts()...)
+	return drivers.NewMetadataWriter(ctx, h.u, h.DB(), h.l.Stdout(), readerOpts()...)
 }
 
 // GetOutput gets the output writer.

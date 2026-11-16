@@ -318,6 +318,10 @@ func Run(ctx context.Context, args *Args, connections map[string]interface{}, in
 	defer l.Close()
 	// create handler
 	h := handler.New(l, u, wd, args.NoPassword)
+	defer func() {
+		_ = h.Rollback()
+		_ = h.Close()
+	}()
 	// force password
 	dsn := args.DSN
 	if args.ForcePassword {
