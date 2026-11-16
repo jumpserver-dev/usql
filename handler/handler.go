@@ -54,10 +54,11 @@ import (
 // statements, and handles backslash (\) commands encountered in the input
 // stream.
 type Handler struct {
-	l    rline.IO
-	user *user.User
-	wd   string
-	nopw bool
+	maskDiagnostics bool
+	l               rline.IO
+	user            *user.User
+	wd              string
+	nopw            bool
 	// timing of every command executed
 	timing bool
 	// singleLineMode is single line mode
@@ -1069,7 +1070,7 @@ func (h *Handler) Version(ctx context.Context) error {
 	ver, err := drivers.Version(ctx, h.u, h.DB())
 	switch {
 	case err != nil:
-		ver = fmt.Sprintf("<unknown, error: %v>", err)
+		ver = fmt.Sprintf("<unknown, error: %v>", h.DiagnosticError(err))
 	case ver == "":
 		ver = "<unknown>"
 	}
@@ -1552,6 +1553,7 @@ func (h *Handler) Include(path string, relative bool) error {
 		Pw:  h.l.Password,
 	}
 	p := New(l, h.user, filepath.Dir(path), h.nopw)
+	p.maskDiagnostics = h.maskDiagnostics
 	p.db, p.u, p.conn, p.tx = h.db, h.u, h.conn, h.tx
 	drivers.ConfigStmt(p.u, p.buf)
 	err = p.Run()
