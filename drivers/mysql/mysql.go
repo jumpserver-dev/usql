@@ -11,6 +11,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 
 	"github.com/go-sql-driver/mysql" // DRIVER
@@ -103,6 +104,18 @@ func init() {
 
 func connectionTLS(params url.Values, host string) (*tls.Config, error) {
 	cfg := &tls.Config{MinVersion: tls.VersionTLS12, ServerName: host}
+	// Some MySQL/MariaDB servers only offer static RSA key exchange. Keep
+	// Go's non-insecure TLS 1.2 suites and add only the two RSA AES-GCM suites;
+	// RC4, 3DES and RSA-CBC remain disabled. TLS 1.3 suites are unaffected.
+	for _, suite := range tls.CipherSuites() {
+		if slices.Contains(suite.SupportedVersions, tls.VersionTLS12) {
+			cfg.CipherSuites = append(cfg.CipherSuites, suite.ID)
+		}
+	}
+	cfg.CipherSuites = append(cfg.CipherSuites,
+		tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
+		tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+	)
 	if name := params.Get("ssl-server-name"); name != "" {
 		cfg.ServerName = name
 	}

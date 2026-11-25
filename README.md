@@ -9,6 +9,15 @@ certificate identity when the socket is an SSH forward. Only explicit
 `ssl-insecure=true` disables verification; it does not permit plaintext fallback.
 Each connection has its own TLS configuration rather than a global named entry.
 
+For MySQL and MariaDB `tls=custom` connections, TLS 1.2 also supports
+`TLS_RSA_WITH_AES_128_GCM_SHA256` and `TLS_RSA_WITH_AES_256_GCM_SHA384` for
+servers that only offer static RSA key exchange. These compatibility suites
+do not provide forward secrecy; configure servers for ECDHE or TLS 1.3 when
+available. Certificate and hostname verification still apply, TLS versions
+below 1.2 remain disabled, and RC4, 3DES and RSA-CBC suites are not enabled.
+TLS 1.3 negotiation is unaffected. This does not change other drivers or the
+MySQL driver's built-in `tls=true`, `tls=skip-verify` or `tls=preferred` modes.
+
 PostgreSQL retains its metadata, COPY and notice support. `hostaddr=127.0.0.1`
 selects a tunnel's dial address while the URL hostname remains the TLS identity.
 `sslmode=verify-full` verifies CA and hostname; `verify-ca` verifies the chain
